@@ -60,13 +60,41 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Configure Pre-Installed Android SDK & Accept Licenses
+        run: |
+          export ANDROID_HOME="\\$\\{ANDROID_HOME:-/usr/local/lib/android/sdk\\}"
+          export ANDROID_SDK_ROOT="\\$ANDROID_HOME"
+          echo "ANDROID_HOME=\\$ANDROID_HOME" >> "\\$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=\\$ANDROID_HOME" >> "\\$GITHUB_ENV"
+          if [ -x "\\$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            yes | "\\$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+          fi
 
       - name: Set up Gradle 8.10.2
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.10.2'
+
+      - name: Materialize Android Studio Project from Source Bundle
+        run: |
+          if [ ! -f "settings.gradle.kts" ] && [ ! -f "android-project/settings.gradle.kts" ] && [ -f "src/data/androidProjectFiles.ts" ]; then
+            node -e '
+              const fs = require("fs");
+              const path = require("path");
+              const src = fs.readFileSync("src/data/androidProjectFiles.ts", "utf8");
+              const jsCode = src
+                .replace(/export interface AndroidProjectFile \\{[\\s\\S]*?\\}\\s*/, "")
+                .replace("export const ANDROID_PROJECT_FILES: AndroidProjectFile[] =", "module.exports =");
+              fs.writeFileSync("/tmp/android_files.cjs", jsCode);
+              const files = require("/tmp/android_files.cjs");
+              for (const f of files) {
+                const target = path.join("android-project", f.path);
+                fs.mkdirSync(path.dirname(target), { recursive: true });
+                fs.writeFileSync(target, f.content, "utf8");
+              }
+              console.log("Extracted " + files.length + " Android project files into android-project/");
+            '
+          fi
 
       - name: Run JUnit4 Unit Tests & Assemble Installable Debug APK
         run: |
@@ -190,16 +218,15 @@ include(":app")
     category: 'Gradle & Build',
     language: 'gradle',
     componentTitle: 'Root Build Configuration',
-    whatItDoes: 'Declares top-level Gradle plugins for Android Application, Kotlin Android, Kotlin Compose Compiler, and KSP (for Room SQLite compilation).',
+    whatItDoes: 'Declares top-level Gradle plugins for Android Application, Kotlin Android, and Kotlin Compose Compiler.',
     whyItIsNeeded: 'Centralizes plugin versions across the project using modern Kotlin 2.0+ Compose compiler plugin.',
-    androidApisUsed: ['AGP 8.7.2', 'Kotlin 2.0.21', 'KSP 2.0.21-1.0.26'],
-    limitations: 'Requires JDK 17 in Android Studio.',
+    androidApisUsed: ['AGP 8.7.2', 'Kotlin 2.0.21'],
+    limitations: 'Requires JDK 17 in Android Studio or GitHub Actions.',
     securityConsiderations: 'No third-party untrusted buildscript plugins.',
     content: `plugins {
     id("com.android.application") version "8.7.2" apply false
     id("org.jetbrains.kotlin.android") version "2.0.21" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false
-    id("com.google.devtools.ksp") version "2.0.21-1.0.26" apply false
 }
 `,
   },
@@ -208,16 +235,15 @@ include(":app")
     category: 'Gradle & Build',
     language: 'gradle',
     componentTitle: 'App Module Gradle Build (Android 10–16 / API 29–35)',
-    whatItDoes: 'Configures namespace tj.internetturbo.app, minSdk 29 (Android 10), targetSdk 35 (Android 15/16 ready), Jetpack Compose Material 3, Navigation Compose, Room Database, Coroutines, and R8 minification.',
+    whatItDoes: 'Configures namespace tj.internetturbo.app, minSdk 29 (Android 10), targetSdk 35 (Android 15/16 ready), Jetpack Compose Material 3, Navigation Compose, Coroutines, and R8 minification.',
     whyItIsNeeded: 'Specifies exact official AndroidX dependencies without bloated third-party libraries.',
-    androidApisUsed: ['Android SDK 29..35', 'Jetpack Compose BOM', 'Room 2.6.1', 'Coroutines 1.9.0'],
+    androidApisUsed: ['Android SDK 29..35', 'Jetpack Compose BOM', 'SQLiteOpenHelper', 'Coroutines 1.9.0'],
     limitations: 'Targets Android 10+ (API 29+) to leverage modern DnsResolver and NetworkCallback APIs without legacy deprecated broadcasts.',
     securityConsiderations: 'Enables R8 code shrinking and resource shrinking in release builds with custom ProGuard rules.',
     content: `plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("com.google.devtools.ksp")
 }
 
 android {
@@ -235,7 +261,6 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
-        resourceConfigurations += listOf("en", "ru", "tg")
     }
 
     buildTypes {
@@ -286,17 +311,10 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.4")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-
-    // Room Local Storage (Offline-first history)
-    val roomVersion = "2.6.1"
-    implementation("androidx.room:room-runtime:\$roomVersion")
-    implementation("androidx.room:room-ktx:\$roomVersion")
-    ksp("androidx.room:room-compiler:\$roomVersion")
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
@@ -1263,29 +1281,26 @@ class TurboVpnService : VpnService() {
     path: 'app/src/main/java/tj/internetturbo/app/data/NetworkHistoryDatabase.kt',
     category: 'Room Local Storage',
     language: 'kotlin',
-    componentTitle: 'NetworkHistoryDatabase.kt (Offline-First Room SQLite Storage)',
-    whatItDoes: 'Stores historical mobile speed tests and optimization results locally on the device using Jetpack Room SQLite with reactive Flow queries.',
-    whyItIsNeeded: 'Allows users to track 4G / 4G+ / 5G download, upload, ping, and DNS latency over time without requiring a cloud account.',
-    androidApisUsed: ['androidx.room.Entity', 'androidx.room.Dao', 'androidx.room.RoomDatabase'],
+    componentTitle: 'NetworkHistoryDatabase.kt (Offline-First SQLite Storage with Reactive Flow)',
+    whatItDoes: 'Stores historical mobile speed tests and optimization results locally on the device using Android SQLiteOpenHelper with reactive StateFlow queries.',
+    whyItIsNeeded: 'Allows users to track 4G / 4G+ / 5G download, upload, ping, and DNS latency over time without requiring a cloud account or external KSP annotation processors.',
+    androidApisUsed: ['android.database.sqlite.SQLiteOpenHelper', 'ContentValues', 'StateFlow'],
     limitations: 'Stored strictly in app-private internal storage.',
     securityConsiderations: 'No cloud syncing or external telemetry; cleared cleanly when the user taps Clear History.',
     content: `package tj.internetturbo.app.data
 
+import android.content.ContentValues
 import android.content.Context
-import androidx.room.Dao
-import androidx.room.Database
-import androidx.room.Entity
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.Room
-import androidx.room.RoomDatabase
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 
-@Entity(tableName = "network_history")
 data class NetworkHistoryEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val id: Long = 0,
     val timestampMillis: Long,
     val downloadMbps: Double,
     val uploadMbps: Double,
@@ -1296,21 +1311,100 @@ data class NetworkHistoryEntity(
     val dnsProviderName: String
 )
 
-@Dao
 interface NetworkHistoryDao {
-    @Query("SELECT * FROM network_history ORDER BY timestampMillis DESC LIMIT 100")
     fun observeHistory(): Flow<List<NetworkHistoryEntity>>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRecord(record: NetworkHistoryEntity)
-
-    @Query("DELETE FROM network_history")
     suspend fun clearAll()
 }
 
-@Database(entities = [NetworkHistoryEntity::class], version = 1, exportSchema = false)
-abstract class NetworkHistoryDatabase : RoomDatabase() {
-    abstract fun historyDao(): NetworkHistoryDao
+class NetworkHistoryDatabase private constructor(context: Context) :
+    SQLiteOpenHelper(context.applicationContext, "internet_turbo_tj_history.db", null, 1),
+    NetworkHistoryDao {
+
+    private val _historyFlow = MutableStateFlow<List<NetworkHistoryEntity>>(emptyList())
+
+    init {
+        _historyFlow.value = queryLatestRecords()
+    }
+
+    override fun onCreate(db: SQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS network_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestampMillis INTEGER NOT NULL,
+                downloadMbps REAL NOT NULL,
+                uploadMbps REAL NOT NULL,
+                pingMs REAL NOT NULL,
+                jitterMs REAL NOT NULL,
+                dnsLatencyMs REAL NOT NULL,
+                networkType TEXT NOT NULL,
+                dnsProviderName TEXT NOT NULL
+            )
+            """.trimIndent()
+        )
+    }
+
+    override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        db.execSQL("DROP TABLE IF EXISTS network_history")
+        onCreate(db)
+    }
+
+    fun historyDao(): NetworkHistoryDao = this
+
+    override fun observeHistory(): Flow<List<NetworkHistoryEntity>> = _historyFlow.asStateFlow()
+
+    override suspend fun insertRecord(record: NetworkHistoryEntity) = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put("timestampMillis", record.timestampMillis)
+            put("downloadMbps", record.downloadMbps)
+            put("uploadMbps", record.uploadMbps)
+            put("pingMs", record.pingMs)
+            put("jitterMs", record.jitterMs)
+            put("dnsLatencyMs", record.dnsLatencyMs)
+            put("networkType", record.networkType)
+            put("dnsProviderName", record.dnsProviderName)
+        }
+        writableDatabase.insert("network_history", null, values)
+        _historyFlow.value = queryLatestRecords()
+    }
+
+    override suspend fun clearAll() = withContext(Dispatchers.IO) {
+        writableDatabase.delete("network_history", null, null)
+        _historyFlow.value = emptyList()
+    }
+
+    private fun queryLatestRecords(): List<NetworkHistoryEntity> {
+        val list = mutableListOf<NetworkHistoryEntity>()
+        val cursor = readableDatabase.query(
+            "network_history",
+            null,
+            null,
+            null,
+            null,
+            null,
+            "timestampMillis DESC",
+            "100"
+        )
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(
+                    NetworkHistoryEntity(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        timestampMillis = c.getLong(c.getColumnIndexOrThrow("timestampMillis")),
+                        downloadMbps = c.getDouble(c.getColumnIndexOrThrow("downloadMbps")),
+                        uploadMbps = c.getDouble(c.getColumnIndexOrThrow("uploadMbps")),
+                        pingMs = c.getDouble(c.getColumnIndexOrThrow("pingMs")),
+                        jitterMs = c.getDouble(c.getColumnIndexOrThrow("jitterMs")),
+                        dnsLatencyMs = c.getDouble(c.getColumnIndexOrThrow("dnsLatencyMs")),
+                        networkType = c.getString(c.getColumnIndexOrThrow("networkType")),
+                        dnsProviderName = c.getString(c.getColumnIndexOrThrow("dnsProviderName"))
+                    )
+                )
+            }
+        }
+        return list
+    }
 
     companion object {
         @Volatile
@@ -1318,11 +1412,7 @@ abstract class NetworkHistoryDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): NetworkHistoryDatabase {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    NetworkHistoryDatabase::class.java,
-                    "internet_turbo_tj_history.db"
-                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
+                INSTANCE ?: NetworkHistoryDatabase(context).also { INSTANCE = it }
             }
         }
     }
@@ -1625,19 +1715,19 @@ fun InternetTurboApp(
                 NavigationBarItem(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    icon = { Icon(Icons.Default.Speed, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
                     label = { Text(stringResource(R.string.nav_dashboard)) }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    icon = { Icon(Icons.Default.NetworkCheck, contentDescription = null) },
+                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
                     label = { Text(stringResource(R.string.nav_speed_test)) }
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    icon = { Icon(Icons.Default.History, contentDescription = null) },
+                    icon = { Icon(Icons.Default.Info, contentDescription = null) },
                     label = { Text(stringResource(R.string.nav_history)) }
                 )
             }
