@@ -338,7 +338,7 @@ export const DnsAndVpnView: React.FC<DnsAndVpnViewProps> = ({
                 <strong>No HTTPS Inspection:</strong> Never decrypts, logs, or monitors your personal traffic.
               </li>
               <li>
-                <strong>Honest Performance Scope:</strong> Improves domain lookup responsiveness; it does not increase the physical Mbps bandwidth cap of your mobile carrier or Wi-Fi plan.
+                <strong>Honest Performance Scope:</strong> Improves domain lookup responsiveness on 4G/4G+/5G; it does not increase the physical Mbps bandwidth cap of your mobile operator plan.
               </li>
             </ul>
             <div className="flex items-center justify-end gap-3 pt-2">

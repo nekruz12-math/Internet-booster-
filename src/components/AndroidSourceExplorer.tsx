@@ -164,13 +164,13 @@ git push -u origin main`;
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-6">
         <div>
           <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            Package: tj.internetturbo.app · MinSDK 29 (Android 10) · TargetSDK 35 (Android 15/16) · GitHub Actions APK Ready
+            Package: tj.internetturbo.app · MinSDK 24 (Android 7.0–16) · TargetSDK 34 · V1+V2+V3 Release Signed APK
           </p>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
             GitHub Automated APK Builder & Android Studio Project
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-3xl">
-            Includes a pre-configured <span className="font-mono">.github/workflows/build-apk.yml</span> pipeline that automatically compiles <span className="font-mono">InternetTurboTJ-mobile-debug.apk</span> on GitHub cloud runners and attaches it to **GitHub Releases** and **Actions Artifacts** for 1-tap phone download.
+            Includes a pre-configured <span className="font-mono">.github/workflows/build-apk.yml</span> pipeline that automatically compiles, aligns (<span className="font-mono">zipalign</span>), and signs <span className="font-mono">InternetTurboTJ-mobile-v1.3.apk</span> with V1+V2+V3 release certificates on GitHub cloud runners.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3 shrink-0">
@@ -229,7 +229,7 @@ git push -u origin main`;
               <span>Step 2: Automatic Cloud APK Build</span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              As soon as your code lands on the <span className="font-mono">main</span> or <span className="font-mono">master</span> branch, GitHub Actions spins up an Ubuntu runner with JDK 17 + Android SDK 35 + Gradle 8.10.2 and compiles <span className="font-mono">InternetTurboTJ-mobile-debug.apk</span> (~2 minutes).
+              As soon as your code lands on the <span className="font-mono">main</span> or <span className="font-mono">master</span> branch, GitHub Actions spins up an Ubuntu runner with JDK 17 + Android SDK + Gradle 8.10.2 and compiles + signs <span className="font-mono">InternetTurboTJ-mobile-v1.3.apk</span> (~2 minutes).
             </p>
           </div>
 
@@ -239,7 +239,7 @@ git push -u origin main`;
               <span>Step 3: Download APK on Your Phone</span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Open your GitHub repository on your Android phone browser, tap <strong>Releases</strong> (or open the <strong>Actions</strong> tab → latest workflow run → <strong>Artifacts</strong>), and tap <span className="font-mono">InternetTurboTJ-mobile-debug.apk</span> to install.
+              Open your GitHub repository on your Android phone browser, tap <strong>Releases</strong> (or open the <strong>Actions</strong> tab → latest workflow run → <strong>Artifacts</strong>), and tap <span className="font-mono">InternetTurboTJ-mobile-v1.3.apk</span> to install.
             </p>
           </div>
         </div>

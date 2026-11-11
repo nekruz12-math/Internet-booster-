@@ -10,18 +10,6 @@ import { ANDROID_PROJECT_FILES } from './src/data/androidProjectFiles.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Ensure the complete Android Studio project exists on disk under /android-project/
-try {
-  for (const file of ANDROID_PROJECT_FILES) {
-    const targetPath = path.join(__dirname, 'android-project', file.path);
-    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    fs.writeFileSync(targetPath, file.content, 'utf8');
-  }
-} catch (err) {
-  console.error('Failed to materialize android-project:', err);
-}
-
 const PORT = 3000;
 
 interface DnsProviderSpec {

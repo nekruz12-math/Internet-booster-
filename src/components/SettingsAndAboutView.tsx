@@ -285,7 +285,7 @@ export const SettingsAndAboutView: React.FC<SettingsAndAboutViewProps> = ({
             </h3>
           </div>
           <p className="text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-            <strong>Principle of Technical Truth:</strong> A smartphone application cannot magically turn a physical 10 Mbps ISP line into 50 Mbps. Internet Turbo TJ improves practical responsiveness by benchmarking and configuring low-latency DNS resolvers, detecting local Wi-Fi 2.4/5 GHz &amp; cellular signal bottlenecks, warming HTTP/TLS sockets, and helping manage background data usage.
+            <strong>Principle of Technical Truth:</strong> A smartphone application cannot magically turn a physical 10 Mbps cellular tower link into 50 Mbps. Internet Turbo TJ improves practical mobile responsiveness by benchmarking and configuring low-latency DNS resolvers, detecting 4G / 4G+ Carrier Aggregation / 5G NR signal bottlenecks, optimizing APN Dual-Stack MTU, warming HTTP/TLS sockets, and blocking background mobile data drain.
           </p>
         </div>
       </div>
