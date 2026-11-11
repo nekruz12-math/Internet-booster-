@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Compile & Package Android APK
+    name: Compile & Sign Universal Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -62,33 +62,42 @@ jobs:
             '
           fi
 
-      - name: Run JUnit4 Unit Tests & Assemble Installable Debug APK
+      - name: Generate V1+V2+V3 Release Keystore & Assemble Signed Universal APK
         run: |
           if [ -f "android-project/settings.gradle.kts" ]; then
             cd android-project
           fi
-          gradle testDebugUnitTest assembleDebug --no-daemon --stacktrace
+          rm -f app/release-key.jks
+          keytool -genkeypair -v \
+            -keystore app/release-key.jks \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias turbo \
+            -storepass turbotj123 \
+            -keypass turbotj123 \
+            -dname "CN=InternetTurboTJ, OU=Mobile, O=TurboTJ, L=Dushanbe, S=TJ, C=TJ"
+          gradle testDebugUnitTest assembleRelease --no-daemon --stacktrace
           mkdir -p "$GITHUB_WORKSPACE/apk-output"
-          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/apk-output/InternetTurboTJ-mobile-debug.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$GITHUB_WORKSPACE/apk-output/InternetTurboTJ-mobile-v1.2.apk"
 
-      - name: Upload Installable APK to GitHub Actions Artifacts
+      - name: Upload Signed APK to GitHub Actions Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: InternetTurboTJ-Android-APK
-          path: apk-output/InternetTurboTJ-mobile-debug.apk
+          name: InternetTurboTJ-Signed-Android-APK
+          path: apk-output/InternetTurboTJ-mobile-v1.2.apk
           if-no-files-found: error
           retention-days: 90
 
-      - name: Publish APK to GitHub Releases
+      - name: Publish Signed Release APK to GitHub Releases
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: "Internet Turbo TJ Mobile v1.0.${{ github.run_number }} (4G/4G+/5G APK)"
+          tag_name: v1.2.${{ github.run_number }}
+          name: "Internet Turbo TJ Mobile v1.2.${{ github.run_number }} (Signed Universal APK)"
           body: |
-            ### Internet Turbo TJ — Mobile Cellular Network Optimizer (Android 10–16)
-            - **Direct APK Download**: Tap `InternetTurboTJ-mobile-debug.apk` under **Assets** below on your Android phone to download and install.
-            - **Package**: `tj.internetturbo.app` · MinSDK 29 (Android 10) · TargetSDK 35 (Android 15/16)
-            - **Capabilities**: Real 6-stage mobile cellular boost, 4G/4G+/5G NR tower RSRP/SINR telemetry, APN Dual-Stack (`IPv4v6`) & MTU (`1428`) inspection, encrypted DNS benchmark (Cloudflare, Google, Quad9, AdGuard), and local-only `TurboVpnService` cellular DNS optimizer.
-          files: apk-output/InternetTurboTJ-mobile-debug.apk
+            ### Internet Turbo TJ — Signed Universal Release APK (Android 8.0–16)
+            - **Direct APK Download**: Tap **`InternetTurboTJ-mobile-v1.2.apk`** under **Assets** below on your Android phone to download and install.
+            - **Signing & Compatibility**: Signed with V1 (JAR) + V2 + V3 Release Signatures (`compileSdk 34` / `targetSdk 34` / `minSdk 26` / `extractNativeLibs=true`) for Xiaomi HyperOS/MIUI, Samsung OneUI, Pixel, and all Android 8–16 smartphones.
+          files: apk-output/InternetTurboTJ-mobile-v1.2.apk
           prerelease: false
